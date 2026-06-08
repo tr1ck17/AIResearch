@@ -6,9 +6,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 np.random.seed(42)
+torch.manual_seed(42)
 
 # data prep, cast to tensors
-df = pd.read_csv('pima.csv', header=None)
+df = pd.read_csv('../data/pima.csv', header=None)
 X = df.iloc[:, :8].values
 y = df.iloc[:, 8].values
 
@@ -19,8 +20,8 @@ X_train = scaler.fit_transform(X_train)
 X_val = scaler.transform(X_val)
 
 X_train_t = torch.tensor(X_train, dtype=torch.float32)
-X_val_t = torch.tensor(X_val, dtype=torch.long)
-y_train_t = torch.tensor(y_train, dtype=torch.float32)
+X_val_t = torch.tensor(X_val, dtype=torch.float32)
+y_train_t = torch.tensor(y_train, dtype=torch.long)
 y_val_t = torch.tensor(y_val, dtype=torch.long)
 
 # the Network (replaces global weights and bias vectors, as well as forward function)
@@ -74,7 +75,7 @@ for epoch in range(epochs):
     optimizer.step()
 
     # log every 100 epochs
-    if epoch % 100 == 0:
+    if epoch % 100 == 0 or epoch == 999:
         model.eval()
         with torch.no_grad():
             # calculate train accuracy
@@ -84,4 +85,5 @@ for epoch in range(epochs):
             val_logits = model(X_val_t)
             val_acc = calculate_accuracy(val_logits, y_val_t)
 
-            print(f"Epoch {epoch:.4d} | Loss: {loss.item():.4f} | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
+            print(f"Epoch {epoch:4d} | Loss: {loss.item():.4f} | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
+

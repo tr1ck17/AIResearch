@@ -5,7 +5,7 @@ from sklearn.preprocessing import StandardScaler
 np.random.seed(42)
 
 # Data
-df = pd.read_csv('pima.csv', header=None)
+df = pd.read_csv('../data/pima.csv', header=None)
 X = df.iloc[:, :8].values
 y = df.iloc[:, 8].values
 
@@ -104,6 +104,11 @@ for epoch in range(epochs):
 
     # log every 100 epochs
     if epoch % 100 == 0:
+        train_acc = accuracy(X_train, y_train)
+        val_acc = accuracy(X_val, y_val)
+        print(f"Epoch {epoch:4d} | Loss: {loss:.4f} | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
+    
+    if epoch == 999:
         train_acc = accuracy(X_train, y_train)
         val_acc = accuracy(X_val, y_val)
         print(f"Epoch {epoch:4d} | Loss: {loss:.4f} | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
