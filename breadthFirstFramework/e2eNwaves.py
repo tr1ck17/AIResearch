@@ -39,7 +39,7 @@ def all_waves_forward(X, waves):
         return np.empty((X.shape[0], 0))
     return np.hstack([wave_forward(X, W, b) for W, b in waves])
 
-# ── Config ────────────────────────────────────────────────────────────────────
+# Config 
 n_waves   = 4
 wave_size = 3
 n_inputs  = 8
@@ -47,15 +47,20 @@ n_classes = 2
 lr        = 0.01
 epochs    = 1000
 
-# ── State ─────────────────────────────────────────────────────────────────────
+# Matrix toggles
+freeze_old_paths = True # true means lock frozen wave rows in W_out, False = let them drift
+use_penalty = True      # true means the orthogonal diversity penalty is on, false means off
+lambda_ = 0.001         # active if use_penalty is True
+
+# State 
 waves  = []
 W_out  = np.empty((0, n_classes))
 b_out  = np.zeros(n_classes)
 
-# ── Training loop ─────────────────────────────────────────────────────────────
+# Training loop
 for wave_idx in range(n_waves):
     W_new = he_init(n_inputs, wave_size)
-    b_new = np.zeros(wave_size)
+    b_new = np.zeros(wave_size) 
 
     W_out = np.vstack([W_out, np.zeros((wave_size, n_classes))])
 
@@ -68,21 +73,40 @@ for wave_idx in range(n_waves):
         A_cat      = np.hstack([frozen_out, new_out]) if frozen_out.shape[1] > 0 else new_out
         probs      = softmax(A_cat @ W_out + b_out)
 
-        # Backward
+        # Loss
         batch_size = X_train.shape[0]
+        ce_loss = cross_entropy(probs, y_train)
+        if use_penalty and frozen_out.shape[1] > 0:
+            penalty = np.sum((frozen_out.T @ new_out) ** 2) / (batch_size ** 2)
+            loss = ce_loss + lambda_ * penalty
+        else:
+            loss = ce_loss
+
+        # Backward
         dlogits = probs.copy()
         dlogits[np.arange(batch_size), y_train] -= 1
         dlogits /= batch_size
 
         dW_out  = A_cat.T @ dlogits
         db_out  = dlogits.sum(axis=0)
-        dA_cat  = dlogits @ W_out.T
-        dA_new  = dA_cat[:, wave_idx * wave_size:]
-        dZ_new  = dA_new * (new_out > 0)
-        dW_new  = X_train.T @ dZ_new
-        db_new  = dZ_new.sum(axis=0)
 
-        # Update only new wave + W_out
+        # structural freezing
+        if freeze_old_paths and wave_idx > 0:
+            frozen_rows = wave_idx * wave_size
+            dW_out[:frozen_rows, :] = 0.0
+
+        dA_cat = dlogits @ W_out.T
+        dA_new = dA_cat[:, wave_idx * wave_size:]
+
+        # conceptual diversity
+        if use_penalty and frozen_out.shape[1] > 0:
+            dA_new = dA_new + lambda_ * 2 * (frozen_out @ (frozen_out.T @ new_out)) / (batch_size ** 2)
+
+        dZ_new = dA_new * (new_out > 0)
+        dW_new = X_train.T @ dZ_new
+        db_new = dZ_new.sum(axis=0)
+
+        # updating only new wave + W_out
         W_new -= lr * dW_new
         b_new -= lr * db_new
         W_out -= lr * dW_out
@@ -93,7 +117,8 @@ for wave_idx in range(n_waves):
             new_val    = wave_forward(X_val, W_new, b_new)
             A_cat_val  = np.hstack([frozen_val, new_val]) if frozen_val.shape[1] > 0 else new_val
             val_probs  = softmax(A_cat_val @ W_out + b_out)
+            val_accuracy = accuracy(val_probs, y_val)
             loss       = cross_entropy(probs, y_train)
-            print(f"Epoch {epoch:4d} | Loss: {loss:.4f} | Val Acc: {accuracy(val_probs, y_val):.4f}")
+            print(f"Epoch {epoch:4d} | Loss: {loss:.4f} | Val Acc: {val_accuracy:.4f}")
 
     waves.append((W_new, b_new))
