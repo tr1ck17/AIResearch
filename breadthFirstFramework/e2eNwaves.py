@@ -122,3 +122,49 @@ for wave_idx in range(n_waves):
             print(f"Epoch {epoch:4d} | Loss: {loss:.4f} | Val Acc: {val_accuracy:.4f}")
 
     waves.append((W_new, b_new))
+
+# XAI feature audit
+import matplotlib.pyplot as plt
+
+feature_names = [
+    "Pregnancies", "Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI", "DiabetesPedigree", "Age"
+]
+
+print("\n Running XAI Feature Audit ")
+# note: weight magnitudes correlate with feature importance here specifically because inputs are normalized via StandardScaler
+
+plt.figure(figsize=(12, 8))
+x_indices = np.arange(len(feature_names))
+bar_width = 0.18
+
+# extracting and plotting feature importances for each wave
+for idx, (W_wave, b_wave) in enumerate(waves):
+    # calculating absolute magnitude averaged across the wave's hidden neurons
+    feature_importance = np.mean(np.abs(W_wave), axis=1)
+
+    # center group bars
+    plt.bar(
+        x_indices + (idx - (n_waves - 1) / 2) * bar_width,
+        feature_importance,
+        width=bar_width,
+        label=f"Wave {idx+1}"
+    )
+
+    # to print feature profile (in full) to console
+    print(f"\nWave {idx+1} Full Feature Profile:")
+    sorted_pairs = sorted(zip(feature_names, feature_importance), key=lambda x: x[1], reverse=True)
+    for feat, val in sorted_pairs:
+        print(f" {feat}: {val:.4f}")
+
+# formatting chart
+plt.title("XAI Feature Audit: How Each Wave Prioritizes Raw Patient Biometrics", fontsize=14, fontweight='bold')
+plt.xlabel("Physical Features", fontsize=12)
+plt.ylabel("Mean Absolute Weight Magnitude (Feature Importance)", fontsize=12)
+plt.xticks(x_indices, feature_names, rotation=15)
+plt.legend()
+plt.tight_layout()
+
+# save the plot directly to research folder
+plt.savefig("xai_feature_audit.png", dpi=300)
+print("\n[SUCCESS] Feature audit saved as 'xai_feature_audit.png'.")
+plt.show()
