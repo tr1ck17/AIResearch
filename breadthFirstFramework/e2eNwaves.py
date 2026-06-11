@@ -62,7 +62,8 @@ for wave_idx in range(n_waves):
     W_new = he_init(n_inputs, wave_size)
     b_new = np.zeros(wave_size) 
 
-    W_out = np.vstack([W_out, np.zeros((wave_size, n_classes))])
+    new_slots = np.random.randn(wave_size, n_classes) * 1e-3
+    W_out = np.vstack([W_out, new_slots])
 
     print(f"\n── Training Wave {wave_idx + 1} ──")
 
