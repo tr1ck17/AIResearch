@@ -49,12 +49,12 @@ epochs = 1000
 print("Training Wave 1:")
 for epoch in range(epochs):
     A1 = wave_forward(X_train, W1, b1)
-    probs = softmax(A1 @ W_out + b_out)
+    probs = softmax(A1 @ W_out + b_out) # get the actual probabilities from forward passing
 
-    batch_size = X_train.shape[0]
-    dlogits = probs.copy()
+    batch_size = X_train.shape[0]   # ready to divide results by the batch size
+    dlogits = probs.copy()          
     dlogits[np.arange(batch_size), y_train] -= 1
-    dlogits /= batch_size
+    dlogits /= batch_size       # effectively have 
 
     dW_out = A1.T @ dlogits
     db_out = dlogits.sum(axis=0)
@@ -110,7 +110,8 @@ for epoch in range(epochs):
     dW2 = X_train.T @ dZ2
     db2 = dZ2.sum(axis=0)
 
-    # wave 1's weights untourched
+    dW_out[:3, :] = 0.0
+
     W2 -= lr * dW2
     b2 -= lr * db2
     W_out -= lr * dW_out
@@ -124,3 +125,44 @@ for epoch in range(epochs):
         loss = cross_entropy(probs, y_train)
         val_accuracy = accuracy(val_probs, y_val)
         print(f"Epoch {epoch:4d} | Loss: {loss:.4f} | Val Acc: {val_accuracy:.4f}")
+
+
+# XAI Feature Audit Visualization
+
+import matplotlib.pyplot as plt
+
+# 1. Calculate feature importance (mean absolute weight magnitude across hidden units)
+# W1 and W2 both have shapes (8, 3) -> mapping 8 inputs to 3 hidden units
+importance_wave1 = np.mean(np.abs(W1), axis=1)
+importance_wave2 = np.mean(np.abs(W2), axis=1)
+
+# 2. Define standard Pima Indian dataset feature labels
+feature_names = [
+    "Pregnancies", "Glucose", "Blood Press.", "Skin Thick.", 
+    "Insulin", "BMI", "Pedigree Func.", "Age"
+]
+
+# 3. Set up the bar chart positioning
+x = np.arange(len(feature_names))
+width = 0.35
+
+fig, ax = plt.subplots(figsize=(10, 6))
+
+# Plot bars for Wave 1 and Wave 2 side-by-side
+rects1 = ax.bar(x - width/2, importance_wave1, width, label='Wave 1 (Base Knowledge)', color='#1f77b4')
+rects2 = ax.bar(x + width/2, importance_wave2, width, label='Wave 2 (No Diversity Penalty)', color='#ff7f0e')
+
+# 4. Add styling, labels, and legends
+ax.set_ylabel('Mean Absolute Weight Magnitude', fontsize=12)
+ax.set_title('Feature Importance Audit: Wave 1 vs Wave 2 (Redundancy Check)', fontsize=14, fontweight='bold')
+ax.set_xticks(x)
+ax.set_xticklabels(feature_names, rotation=15, ha='right', fontsize=10)
+ax.legend(fontsize=11)
+ax.grid(axis='y', linestyle='--', alpha=0.7)
+
+plt.tight_layout()
+
+# Save the visual artifact for your check-in
+plt.savefig('xai_feature_audit__manual_2waves.png', dpi=300)
+print("\n[SUCCESS] Visual feature audit saved as 'xai_feature_audit_2waves.png'")
+plt.show()

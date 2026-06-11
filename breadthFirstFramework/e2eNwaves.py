@@ -40,7 +40,7 @@ def all_waves_forward(X, waves):
     return np.hstack([wave_forward(X, W, b) for W, b in waves])
 
 # Config 
-n_waves   = 4
+n_waves   = 2
 wave_size = 3
 n_inputs  = 8
 n_classes = 2
@@ -77,7 +77,8 @@ for wave_idx in range(n_waves):
         batch_size = X_train.shape[0]
         ce_loss = cross_entropy(probs, y_train)
         if use_penalty and frozen_out.shape[1] > 0:
-            penalty = np.sum((frozen_out.T @ new_out) ** 2) / (batch_size ** 2)
+            correlation = frozen_out.T @ new_out
+            penalty = np.sum(correlation ** 2) / (batch_size ** 2)
             loss = ce_loss + lambda_ * penalty
         else:
             loss = ce_loss
@@ -165,6 +166,6 @@ plt.legend()
 plt.tight_layout()
 
 # save the plot directly to research folder
-plt.savefig("xai_feature_audit.png", dpi=300)
-print("\n[SUCCESS] Feature audit saved as 'xai_feature_audit.png'.")
+plt.savefig("xai_feature_audit_Nwaves.png", dpi=300)
+print("\n[SUCCESS] Feature audit saved as 'xai_feature_audit_4waves.png'.")
 plt.show()

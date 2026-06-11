@@ -24,7 +24,7 @@ def softmax(A):
 
 def he_init(fan_in, fan_out):
     std = np.sqrt(2.0 / fan_in)
-    return np.random.rand(fan_in, fan_out) * std
+    return np.random.randn(fan_in, fan_out) * std
 
 def wave_forward(X, W, b):
     return relu(X @ W + b)
@@ -34,7 +34,7 @@ def cross_entropy(probs, y_true):
     correct_probs = probs[np.arange(batch_size), y_true]
     return -np.mean(np.log(correct_probs + 1e-8))
 
-def accuracy(probs, y_true):
+def accuracy(probs, y_true):    
     return np.mean(np.argmax(probs, axis=1) == y_true)
 
 # Weights
