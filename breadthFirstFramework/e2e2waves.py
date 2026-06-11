@@ -24,7 +24,7 @@ def softmax(A):
 
 def he_init(fan_in, fan_out):
     std = np.sqrt(2.0 / fan_in)
-    return np.random.rand(fan_in, fan_out) * std
+    return np.random.randn(fan_in, fan_out) * std # randn rather than rand
 
 def wave_forward(X, W, b):
     return relu(X @ W + b)
@@ -80,9 +80,9 @@ for epoch in range(epochs):
 # now wave 1 frozen
 
 # Wave 2
-# grow W_out from (3, 2) to (6, 2) - new rows init to 0 
 W2 = he_init(8, 3)
 b2 = np.zeros(3)
+# init wave 2 output weights to a tiny variance to break the cold-start
 W_out = np.vstack([W_out, np.zeros((3, 2))])    # (6, 2)
 b_out = b_out
 
