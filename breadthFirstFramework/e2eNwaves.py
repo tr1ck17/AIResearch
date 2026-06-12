@@ -41,7 +41,7 @@ def all_waves_forward(X, waves):
 
 # Config 
 n_waves   = 1
-wave_size = 3
+wave_size = 5
 n_inputs  = 8
 n_classes = 2
 lr        = 0.01
