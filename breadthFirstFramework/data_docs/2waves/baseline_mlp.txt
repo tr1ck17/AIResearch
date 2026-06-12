@@ -1,0 +1,47 @@
+── Training Wave 1 ──
+Epoch    0 | Loss: 0.6934 | Val Acc: 0.6558
+Epoch  100 | Loss: 0.6314 | Val Acc: 0.6623
+Epoch  200 | Loss: 0.6058 | Val Acc: 0.6883
+Epoch  300 | Loss: 0.5876 | Val Acc: 0.6948
+Epoch  400 | Loss: 0.5724 | Val Acc: 0.7013
+Epoch  500 | Loss: 0.5597 | Val Acc: 0.6948
+Epoch  600 | Loss: 0.5491 | Val Acc: 0.7273
+Epoch  700 | Loss: 0.5406 | Val Acc: 0.7208
+Epoch  800 | Loss: 0.5334 | Val Acc: 0.7208
+Epoch  900 | Loss: 0.5270 | Val Acc: 0.7143
+Epoch  999 | Loss: 0.5213 | Val Acc: 0.7208
+
+── Training Wave 2 ──
+Epoch    0 | Loss: 0.5213 | Val Acc: 0.7208
+Epoch  100 | Loss: 0.5178 | Val Acc: 0.7208
+Epoch  200 | Loss: 0.5148 | Val Acc: 0.7208
+Epoch  300 | Loss: 0.5122 | Val Acc: 0.7143
+Epoch  400 | Loss: 0.5097 | Val Acc: 0.7143
+Epoch  500 | Loss: 0.5072 | Val Acc: 0.7273
+Epoch  600 | Loss: 0.5048 | Val Acc: 0.7273
+Epoch  700 | Loss: 0.5024 | Val Acc: 0.7273
+Epoch  800 | Loss: 0.5000 | Val Acc: 0.7273
+Epoch  900 | Loss: 0.4976 | Val Acc: 0.7273
+Epoch  999 | Loss: 0.4952 | Val Acc: 0.7338
+
+ Running XAI Feature Audit 
+
+Wave 1 Full Feature Profile:
+ DiabetesPedigree: 0.6037
+ Insulin: 0.5986
+ Glucose: 0.5029
+ BloodPressure: 0.4658
+ Age: 0.3478
+ BMI: 0.3396
+ Pregnancies: 0.2626
+ SkinThickness: 0.1676
+
+Wave 2 Full Feature Profile:
+ BloodPressure: 0.5594
+ Glucose: 0.5207
+ Pregnancies: 0.4313
+ DiabetesPedigree: 0.3984
+ BMI: 0.3893
+ Age: 0.3213
+ Insulin: 0.3153
+ SkinThickness: 0.1796

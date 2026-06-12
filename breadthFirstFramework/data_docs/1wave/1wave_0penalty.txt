@@ -1,0 +1,24 @@
+── Training Wave 1 ──
+Epoch    0 | Loss: 0.6934 | Val Acc: 0.6558
+Epoch  100 | Loss: 0.6314 | Val Acc: 0.6623
+Epoch  200 | Loss: 0.6058 | Val Acc: 0.6883
+Epoch  300 | Loss: 0.5876 | Val Acc: 0.6948
+Epoch  400 | Loss: 0.5724 | Val Acc: 0.7013
+Epoch  500 | Loss: 0.5597 | Val Acc: 0.6948
+Epoch  600 | Loss: 0.5491 | Val Acc: 0.7273
+Epoch  700 | Loss: 0.5406 | Val Acc: 0.7208
+Epoch  800 | Loss: 0.5334 | Val Acc: 0.7208
+Epoch  900 | Loss: 0.5270 | Val Acc: 0.7143
+Epoch  999 | Loss: 0.5213 | Val Acc: 0.7208
+
+ Running XAI Feature Audit 
+
+Wave 1 Full Feature Profile:
+ DiabetesPedigree: 0.6037
+ Insulin: 0.5986
+ Glucose: 0.5029
+ BloodPressure: 0.4658
+ Age: 0.3478
+ BMI: 0.3396
+ Pregnancies: 0.2626
+ SkinThickness: 0.1676

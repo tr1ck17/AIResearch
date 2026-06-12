@@ -40,7 +40,7 @@ def all_waves_forward(X, waves):
     return np.hstack([wave_forward(X, W, b) for W, b in waves])
 
 # Config 
-n_waves   = 2
+n_waves   = 1
 wave_size = 3
 n_inputs  = 8
 n_classes = 2
@@ -50,7 +50,7 @@ epochs    = 1000
 # Matrix toggles
 freeze_old_paths = True # true means lock frozen wave rows in W_out, False = let them drift
 use_penalty = True      # true means the orthogonal diversity penalty is on, false means off
-lambda_ = 0.001         # active if use_penalty is True
+lambda_ = 0.00         # active if use_penalty is True
 
 # State 
 waves  = []
