@@ -28,7 +28,7 @@ def he_init(fan_in, fan_out): # better initialization for ReLU
     return np.random.randn(fan_in, fan_out) * std
 
 n_inputs = 8
-n_hidden = 16
+n_hidden = 14
 n_classes = 2
     
 W1 = he_init(n_inputs, n_hidden)

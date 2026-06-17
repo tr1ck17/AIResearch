@@ -40,7 +40,7 @@ def all_waves_forward(X, waves):
     return np.hstack([wave_forward(X, W, b) for W, b in waves])
 
 # Config 
-n_waves   = 1
+n_waves   = 2
 wave_size = 3
 n_inputs  = 8
 n_classes = 2
