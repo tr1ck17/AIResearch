@@ -334,6 +334,7 @@ def main():
     sim_mean = {k: [] for k in pen_specs}
     sim_max = {k: [] for k in pen_specs}
     sim_sub = {k: [] for k in pen_specs}
+    acc_w = {k: [] for k in pen_specs}
 
     print(f"Running {len(SEEDS)} seeds x {N_FOLDS} folds = {len(SEEDS)*N_FOLDS} "
           f"runs per configuration...\n")
@@ -353,7 +354,9 @@ def main():
 
             # Claim B: decorrelation per penalty (same init => only penalty differs)
             for name, (mode, lam) in pen_specs.items():
-                _, w = train_waves(Xtr, ytr, Xva, yva, mode, lam, seed=init)
+                #_, w = train_waves(Xtr, ytr, Xva, yva, mode, lam, seed=init)
+                a_w, w = train_waves(Xtr, ytr, Xva, yva, mode, lam, seed=init)
+                acc_w[name].append(a_w)
                 m_, mx_ = mean_pairwise_sim(w)
                 sim_mean[name].append(m_)
                 sim_max[name].append(mx_)
@@ -377,11 +380,12 @@ def main():
     print("="*70)
     base_m, base_s = M(sim_mean["OFF (baseline)"])
     print(f"    noise bar (std of baseline mean-sim) = {base_s:.3f}\n")
-    print(f"    {'configuration':<20} {'mean-sim':>16} {'max-sim':>10} {'subspace':>10}")
+    print(f"    {'configuration':<20} {'mean-sim':>16} {'max-sim':>10} {'subspace':>10} {'acc':>8}")
     bm, bs = M(sim_mean["OFF (baseline)"])
     xm, _  = M(sim_max["OFF (baseline)"])
     sm, _  = M(sim_sub["OFF (baseline)"])
-    print(f"    {'OFF (baseline)':<20} {bm:>8.3f} +/- {bs:.3f} {xm:>10.3f} {sm:>10.3f}")
+    am, _ = M(acc_w["OFF (baseline)"])
+    print(f"    {'OFF (baseline)':<20} {bm:>8.3f} +/- {bs:.3f} {xm:>10.3f} {sm:>10.3f} {am:>8.3f}")
     for name in pen_specs:
         if name == "OFF (baseline)": continue
         m, s = M(sim_mean[name])
@@ -389,7 +393,8 @@ def main():
         sub, _ = M(sim_sub[name])
         d = m - base_m
         flag = " <--" if abs(d) > base_s else ""
-        print(f"    {name:<20} {m:>8.3f} +/- {s:.3f} {x:>10.3f} {sub:>10.3f}{flag}")
+        a, _ = M(acc_w[name])
+        print(f"    {name:<20} {m:>8.3f} +/- {s:.3f} {x:>10.3f} {sub:>10.3f} {a:>8.3f}{flag}")
 
 if __name__ == "__main__":
     main()
