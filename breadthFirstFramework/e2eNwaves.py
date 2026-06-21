@@ -22,8 +22,8 @@ def softmax(x):
     e = np.exp(x - np.max(x, axis=1, keepdims=True))
     return e / e.sum(axis=1, keepdims=True)
 
-def he_init(fan_in, fan_out):
-    return np.random.randn(fan_in, fan_out) * np.sqrt(2.0 / fan_in)
+def he_init(i, o):
+    return np.random.randn(i, o) * np.sqrt(2.0 / i)
 
 def wave_forward(X, W, b):
     return relu(X @ W + b)
@@ -39,6 +39,33 @@ def all_waves_forward(X, waves):
         return np.empty((X.shape[0], 0))
     return np.hstack([wave_forward(X, W, b) for W, b in waves])
 
+def apply_penalty(mode, lam, fo, no, Wn, frozen_W, dA, n):
+    dW_pen = 0.0
+    if mode == "uncentered":
+        dA = dA + lam * 2 * (fo @ (fo.T @ no)) / (n**2)
+    elif mode == "centered":
+        Fc, Nc = fo - fo.mean(0), no - no.mean(0)
+        g = 2 * (Fc @ (Fc.T @ Nc)) / (n**2)
+        dA = dA + lam * (g - g.mean(0))
+    elif mode == "cosine_act":
+        Fc, Nc = fo - fo.mean(0), no - no.mean(0)
+        fn = np.linalg.norm(Fc, axis=0) + 1e-12
+        U  = Fc / fn
+        ng2 = (Nc * Nc).sum(0) + 1e-12
+        MG  = U @ (U.T @ Nc)
+        Sb  = (Nc * MG).sum(0) / ng2
+        gg  = 2 * (MG - Nc * Sb) / ng2
+        dA = dA + lam * (gg - gg.mean(0))
+    elif mode == "weight_dec":
+        Wf = np.hstack(frozen_W)
+        fn = np.linalg.norm(Wf, axis=0) + 1e-12
+        Uf = Wf / fn
+        wn2 = (Wn * Wn).sum(0) + 1e-12
+        MW  = Uf @ (Uf.T @ Wn)
+        Sj  = (Wn * MW).sum(0) / wn2
+        dW_pen = lam * 2 * (MW - Wn * Sj) / wn2
+    return dA, dW_pen
+
 # Config 
 n_waves   = 2
 wave_size = 3
@@ -49,8 +76,8 @@ epochs    = 1000
 
 # Matrix toggles
 freeze_old_paths = True # true means lock frozen wave rows in W_out, False = let them drift
-use_penalty = True     # true means the orthogonal diversity penalty is on, false means off
-lambda_ = 0.00001         # active if use_penalty is True
+penalty_mode = "uncentered"     # "off" | "uncentered" | "centered" | "cosine_act" | "weight_dec"
+lambda_ = 0.001
 
 # State 
 waves  = []
@@ -74,15 +101,7 @@ for wave_idx in range(n_waves):
         A_cat      = np.hstack([frozen_out, new_out]) if frozen_out.shape[1] > 0 else new_out
         probs      = softmax(A_cat @ W_out + b_out)
 
-        # Loss
         batch_size = X_train.shape[0]
-        ce_loss = cross_entropy(probs, y_train)
-        if use_penalty and frozen_out.shape[1] > 0:
-            correlation = frozen_out.T @ new_out
-            penalty = np.sum(correlation ** 2) / (batch_size ** 2)
-            loss = ce_loss + lambda_ * penalty
-        else:
-            loss = ce_loss
 
         # Backward
         dlogits = probs.copy()
@@ -100,12 +119,15 @@ for wave_idx in range(n_waves):
         dA_cat = dlogits @ W_out.T
         dA_new = dA_cat[:, wave_idx * wave_size:]
 
-        # conceptual diversity
-        if use_penalty and frozen_out.shape[1] > 0:
-            dA_new = dA_new + lambda_ * 2 * (frozen_out @ (frozen_out.T @ new_out)) / (batch_size ** 2)
+        # conceptual diversity (mode selected in config; shared with cv_evaluation.py)
+        dW_pen = 0.0
+        if penalty_mode != "off" and frozen_out.shape[1] > 0:
+            frozen_W = [W for W, b in waves]
+            dA_new, dW_pen = apply_penalty(penalty_mode, lambda_, frozen_out, new_out,
+                                           W_new, frozen_W, dA_new, batch_size)
 
         dZ_new = dA_new * (new_out > 0)
-        dW_new = X_train.T @ dZ_new
+        dW_new = X_train.T @ dZ_new + dW_pen
         db_new = dZ_new.sum(axis=0)
 
         # updating only new wave + W_out
@@ -167,6 +189,7 @@ plt.legend()
 plt.tight_layout()
 
 # save the plot directly to research folder
-plt.savefig("xai_feature_audit_Nwaves.png", dpi=300)
-print("\n[SUCCESS] Feature audit saved as 'xai_feature_audit_4waves.png'.")
+out_name = f"xai_feature_audit_{n_waves}waves_{penalty_mode}.png"
+plt.savefig(out_name, dpi=300)
+print(f"\n[SUCCESS] Feature audit saved as '{out_name}'.")
 plt.show()
