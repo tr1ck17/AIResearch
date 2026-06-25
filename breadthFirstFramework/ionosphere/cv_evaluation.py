@@ -417,10 +417,13 @@ def main():
     wave_accs = np.array(wav_acc)
 
     # descriptive: each net in its own (shared fold-noise still inside these stds)
+    deep_accs = np.array(deep_acc)
     vanilla_mean, vanilla_std = mean_std(vanilla_accs)
-    wave_mean, wave_std = mean_std(wave_accs)
+    deep_mean, deep_std       = mean_std(deep_accs)
+    wave_mean, wave_std       = mean_std(wave_accs)
     print(f"    vanilla MLP (16 hidden) : {vanilla_mean:.4f} +/- {vanilla_std:.4f}")
-    print(f"    wave net (5x3 = 15)     : {wave_mean:.4f} +/- {wave_std:.4f}")
+    print(f"    deep MLP    (8+8=16)    : {deep_mean:.4f} +/- {deep_std:.4f}")
+    print(f"    wave net    (5x3 = 15)  : {wave_mean:.4f} +/- {wave_std:.4f}")
 
     # paired test: same fold ran both nets, so the difference cancels fold-difficulty
     per_fold_diff   = wave_accs - vanilla_accs        # 25 head-to-head margins
@@ -441,11 +444,7 @@ def main():
         verdict = "WAVE NET WORSE (CI entirely below 0)"
     else:
         verdict = "WAVE NET BETTER (CI entirely above 0)"
-    print(f"    --> {verdict}")  
-
-    deep_accs = np.array(deep_acc)
-    deep_mean, deep_std = mean_std(deep_accs)
-    print(f"    deep MLP (8+8=16)   : {deep_mean:.4f} +/- {deep_std:.4f}")
+    print(f"    --> {verdict}")
 
     diff_wd = wave_accs - deep_accs
     mean_wd = diff_wd.mean()
