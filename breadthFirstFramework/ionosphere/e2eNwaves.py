@@ -5,9 +5,11 @@ from sklearn.preprocessing import StandardScaler
 np.random.seed(42)
 
 # Data
-df = pd.read_csv('../data/pima.csv', header=None)
-X = df.iloc[:, :8].values
-y = df.iloc[:, 8].values
+df = pd.read_csv('../../data/ionosphere.csv', header=None)
+X = df.iloc[:, :-1].values.astype(float)
+y = np.where(df.iloc[:, -1].values == 'g', 1, 0) # labels are text: g->1, b->0
+keep = X.std(axis=0) > 1e-12    # drop zero-variance cols (col 1 is all zeros)
+X = X[:, keep]                  # -> 33 features
 
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
@@ -69,14 +71,14 @@ def apply_penalty(mode, lam, fo, no, Wn, frozen_W, dA, n):
 # Config 
 n_waves   = 5
 wave_size = 3
-n_inputs  = 8
+n_inputs  = 33
 n_classes = 2
 lr        = 0.01
-epochs    = 100
+epochs    = 1000
 
 # Matrix toggles
 freeze_old_paths = True # true means lock frozen wave rows in W_out, False = let them drift
-penalty_mode = "weight_dec"     # "off" | "uncentered" | "centered" | "cosine_act" | "weight_dec"
+penalty_mode = "off"     # "off" | "uncentered" | "centered" | "cosine_act" | "weight_dec"
 #lambda_ = 0.001
 lambda_ = 1.00
 
@@ -151,9 +153,7 @@ for wave_idx in range(n_waves):
 # XAI feature audit
 import matplotlib.pyplot as plt
 
-feature_names = [
-    "Pregnancies", "Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI", "DiabetesPedigree", "Age"
-]
+feature_names = [f"f{i}" for i in range(33)]
 
 print("\n Running XAI Feature Audit ")
 # note: weight magnitudes correlate with feature importance here specifically because inputs are normalized via StandardScaler

@@ -27,7 +27,7 @@ import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 
 # SECTION 1
-DATA_PATH = "../data/pima.csv"      # path to data from current dir
+DATA_PATH = "../../data/ionosphere.csv"      # path to data from current dir
 
 # fixed seed list with enough randomness for meaningful results + reproducibility
 SEEDS = [42, 7, 123, 2024, 88]
@@ -44,9 +44,9 @@ WAVE_SIZE = 3
 
 # different levels of magnitude for penalty strength, checking for effect
 LAMBDAS = [0.1, 1.0, 5.0]
-N_INPUTS = 8
+N_INPUTS = 33
 N_CLASSES = 2
-FEATURES = ["Pregnancies", "Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI", "DiabetesPedigree", "Age"]
+FEATURES = [f"f{i}" for i in range(33)]
 
 # SECTION 2
 def relu(z):
@@ -322,8 +322,10 @@ def main():
     run_gradient_checks()
 
     df = pd.read_csv(DATA_PATH, header=None)
-    X = np.asarray(df.iloc[:,:8].values, dtype=float)
-    y = np.asarray(df.iloc[:,8].values, dtype=int)
+    X = df.iloc[:, :-1].values.astype(float)
+    y = (df.iloc[:, -1].values == 'g').astype(int)
+    keep = X.std(axis=0) > 1e-12
+    X = X[:, keep]
 
     van_acc, wav_acc = [], []
     # penalty modes for CLAIM B: baseline + each formulation at each lambda
@@ -344,7 +346,7 @@ def main():
         for k, (tr, va) in enumerate(skf.split(X, y)):
             mu, sd = X[tr].mean(0), X[tr].std(0); sd[sd == 0] = 1
             Xtr, Xva = (X[tr]-mu)/sd, (X[va]-mu)/sd
-            ytr, yva = y[tr], y[va]
+            ytr, yva = y[tr].astype(int), y[va].astype(int)
             init = seed * 1000 + k          # reproducible, unique per (seed, fold)
 
             # Claim A: accuracy, identical settings
