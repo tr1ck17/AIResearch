@@ -61,7 +61,7 @@ def cross_entropy(p, y):
 def acc(p, y):
     return np.mean(np.argmax(p, 1) == y)
 
-# SECTION 3 (the two models)
+# SECTION 3 (vanilla standard 1 hidden, vanilla standard 2 hidden, vanilla breadth)
 def train_vanilla(Xtr, ytr, Xva, yva, seed):
     # 8 inputs features -> VANILLA_HIDDEN -> 2 classes
     rng = np.random.default_rng(seed)
@@ -94,6 +94,47 @@ def train_vanilla(Xtr, ytr, Xva, yva, seed):
     A1v = relu(Xva @ W1 + b1)
     A2v = softmax(A1v @ W2 + b2)
     return acc(A2v, yva)
+
+def train_deep(Xtr, ytr, Xva, yva, seed):
+    # 33 inputs -> 8 -> 8 -> 2 (two hidden layers, 16 total units to match vanilla 1 hidden layer's units)
+    rng = np.random.default_rng(seed)
+    H1, H2 = 8, 8
+    W1 = he_init(rng, N_INPUTS, H1)
+    b1 = np.zeros(H1)
+    W2 = he_init(rng, H1, H2)
+    b2 = np.zeros(H2)
+    W3 = he_init(rng, H2, N_CLASSES)
+    b3 = np.zeros(N_CLASSES)
+    n = len(Xtr)
+    for _ in range(EPOCHS):
+        A1 = relu(Xtr @ W1 + b1)
+        A2 = relu(A1 @ W2 + b2)
+        A3 = softmax(A2 @ W3 + b3)
+        dZ3 = A3.copy()
+        dZ3[np.arange(n), ytr] -= 1
+        dZ3 /= n
+        dW3 = A2.T @ dZ3
+        db3 = dZ3.sum(axis=0)
+        dA2 = dZ3 @ W3.T
+        dZ2 = dA2 * (A2 > 0)
+        dW2 = A1.T @ dZ2
+        db2 = dZ2.sum(axis=0)
+        dA1 = dZ2 @ W2.T
+        dZ1 = dA1 * (A1 > 0)
+        dW1 = Xtr.T @ dZ1
+        db1 = dZ1.sum(axis=0)
+
+        W1 -= LR * dW1
+        b1 -= LR * db1
+        W2 -= LR * dW2
+        b2 -= LR * db2        
+        W3 -= LR * dW3
+        b3 -= LR * db3
+    
+    A1v = relu(Xva @ W1 + b1)
+    A2v = relu(A1v @ W2 + b2)
+    A3v = softmax(A2v @ W3 + b3)
+    return acc(A3v, yva)
 
 def train_waves(Xtr, ytr, Xva, yva, penalty_mode, lam, seed):
     # constructive wave net
@@ -323,11 +364,12 @@ def main():
 
     df = pd.read_csv(DATA_PATH, header=None)
     X = df.iloc[:, :-1].values.astype(float)
-    y = (df.iloc[:, -1].values == 'g').astype(int)
+    #y = (df.iloc[:, -1].values == 'g').astype(int)
+    y = np.where(df.iloc[:, -1].values == 'g', 1, 0)
     keep = X.std(axis=0) > 1e-12
     X = X[:, keep]
 
-    van_acc, wav_acc = [], []
+    van_acc, wav_acc, deep_acc = [], [], []
     # penalty modes for CLAIM B: baseline + each formulation at each lambda
     pen_specs = {"OFF (baseline)": ("off", 0.0)}
     for lam in LAMBDAS:
@@ -351,6 +393,7 @@ def main():
 
             # Claim A: accuracy, identical settings
             van_acc.append(train_vanilla(Xtr, ytr, Xva, yva, seed=init))
+            deep_acc.append(train_deep(Xtr, ytr, Xva, yva, seed=init))
             a, _ = train_waves(Xtr, ytr, Xva, yva, "off", 0.0, seed=init)
             wav_acc.append(a)
 
@@ -399,6 +442,25 @@ def main():
     else:
         verdict = "WAVE NET BETTER (CI entirely above 0)"
     print(f"    --> {verdict}")  
+
+    deep_accs = np.array(deep_acc)
+    deep_mean, deep_std = mean_std(deep_accs)
+    print(f"    deep MLP (8+8=16)   : {deep_mean:.4f} +/- {deep_std:.4f}")
+
+    diff_wd = wave_accs - deep_accs
+    mean_wd = diff_wd.mean()
+    se_wd = diff_wd.std(ddof=1) / np.sqrt(len(diff_wd))
+    lo_wd = mean_wd - t_critical * se_wd
+    hi_wd = mean_wd + t_critical * se_wd
+    print(f"\n  paired difference (wave - deep), n={len(diff_wd)}")
+    print(f"    mean diff = {mean_wd:+.4f}  std error = {se_wd:.4f}")
+    print(f"    95% CI = [{lo_wd:+.4f}, {hi_wd:+.4f}]")
+    if lo_wd <= 0 <= hi_wd:
+        print("     --> wave vs deep: INDISTINGUISHABLE (CI contains 0)")
+    elif hi_wd < 0:
+        print("     --> wave vs deep: WAVE WORSE")
+    else:
+        print("     --> wave vs deep: WAVE BETTER")
     
     print("\n" + "="*70)
     print("CLAIM B -- DECORRELATION (Wave1 vs Wave2 similarity; lower = better)")
