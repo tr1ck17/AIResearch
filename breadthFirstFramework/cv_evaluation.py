@@ -120,10 +120,7 @@ def train_waves(Xtr, ytr, Xva, yva, penalty_mode, lam, seed):
     for wave_idx in range(N_WAVES):
         W_new = he_init(rng, N_INPUTS, WAVE_SIZE)
         b_new = np.zeros(WAVE_SIZE)
-        # new output rows: tiny RANDOM, not zero
-        # exact zeros would give the new wave zero gradient (dA = dlogits @ W_out.T would be 0 on its columns)
-        # thereby deadlocking it. Small random breaks that
-
+        # tiny random init: exact zeros deadlock the new wave (zero cols in W_out -> zero gradient into it)
         W_out = np.vstack([W_out, rng.standard_normal((WAVE_SIZE, N_CLASSES)) * 1e-3])
 
         for _ in range(EPOCHS):
@@ -305,6 +302,22 @@ def mean_pairwise_sim(waves):
             for i in range(len(profs)) for j in range(i+1, len(profs))]
     return float(np.mean(sims)), float(np.max(sims))
 
+def activation_decorrelation(waves, X):
+    # activation-space analogue of mean_pairwise_sim, computed on real data X
+    # each wave -> mean activation per sample, mean-centered across samples
+    # returns mean absolute Pearson correlation over wave pairs; lower = more decorrelated
+    acts = []
+    for W, b in waves:
+        a = relu(X @ W + b).mean(axis=1)
+        a = a - a.mean()
+        acts.append(a)
+    corrs = []
+    for i in range(len(acts)):
+        for j in range(i + 1, len(acts)):
+            denom = (np.linalg.norm(acts[i]) * np.linalg.norm(acts[j])) + 1e-12
+            corrs.append(abs((acts[i] @ acts[j]) / denom))
+    return float(np.mean(corrs))
+
 def subspace_alignment(waves):
     Ws = [W for W, _ in waves]
     vals = []
@@ -334,6 +347,7 @@ def main():
     sim_mean = {k: [] for k in pen_specs}
     sim_max = {k: [] for k in pen_specs}
     sim_sub = {k: [] for k in pen_specs}
+    sim_act = {k: [] for k in pen_specs}
     acc_w = {k: [] for k in pen_specs}
 
     print(f"Running {len(SEEDS)} seeds x {N_FOLDS} folds = {len(SEEDS)*N_FOLDS} "
@@ -354,13 +368,13 @@ def main():
 
             # Claim B: decorrelation per penalty (same init => only penalty differs)
             for name, (mode, lam) in pen_specs.items():
-                #_, w = train_waves(Xtr, ytr, Xva, yva, mode, lam, seed=init)
                 a_w, w = train_waves(Xtr, ytr, Xva, yva, mode, lam, seed=init)
                 acc_w[name].append(a_w)
                 m_, mx_ = mean_pairwise_sim(w)
                 sim_mean[name].append(m_)
                 sim_max[name].append(mx_)
                 sim_sub[name].append(subspace_alignment(w))
+                sim_act[name].append(activation_decorrelation(w, Xva))
 
     mean_std = lambda values: (np.mean(values), np.std(values))
 
@@ -369,22 +383,21 @@ def main():
     print("="*70)
 
     vanilla_accs = np.array(van_acc)
-    wave_accs = np.array(wav_acc)
+    wave_accs    = np.array(wav_acc)
 
-    # descriptive: each net in its own (shared fold-noise still inside these stds)
     vanilla_mean, vanilla_std = mean_std(vanilla_accs)
-    wave_mean, wave_std = mean_std(wave_accs)
+    wave_mean, wave_std       = mean_std(wave_accs)
     print(f"    vanilla MLP (16 hidden) : {vanilla_mean:.4f} +/- {vanilla_std:.4f}")
-    print(f"    wave net (5x3 = 15)     : {wave_mean:.4f} +/- {wave_std:.4f}")
+    print(f"    wave net    (5x3 = 15)  : {wave_mean:.4f} +/- {wave_std:.4f}")
 
     # paired test: same fold ran both nets, so the difference cancels fold-difficulty
-    per_fold_diff   = wave_accs - vanilla_accs        # 25 head-to-head margins
-    num_folds       = len(per_fold_diff)
-    mean_diff       = per_fold_diff.mean()
-    std_error       = per_fold_diff.std(ddof=1) / np.sqrt(num_folds)
-    t_critical      = 2.064         # t, 24 dof, 95% (n=25)
-    ci_low          = mean_diff - t_critical * std_error
-    ci_high         = mean_diff + t_critical * std_error
+    per_fold_diff = wave_accs - vanilla_accs
+    num_folds     = len(per_fold_diff)
+    mean_diff     = per_fold_diff.mean()
+    std_error     = per_fold_diff.std(ddof=1) / np.sqrt(num_folds)
+    t_critical    = 2.064                   # t, 24 dof, 95% (n=25)
+    ci_low        = mean_diff - t_critical * std_error
+    ci_high       = mean_diff + t_critical * std_error
 
     print(f"\n  paired difference (wave - vanilla), n={num_folds}")
     print(f"    mean diff = {mean_diff:+.4f}    std error = {std_error:.4f}")
@@ -396,28 +409,30 @@ def main():
         verdict = "WAVE NET WORSE (CI entirely below 0)"
     else:
         verdict = "WAVE NET BETTER (CI entirely above 0)"
-    print(f"    --> {verdict}")  
+    print(f"    --> {verdict}")
     
     print("\n" + "="*70)
     print("CLAIM B -- DECORRELATION (Wave1 vs Wave2 similarity; lower = better)")
     print("="*70)
     base_m, base_s = mean_std(sim_mean["OFF (baseline)"])
     print(f"    noise bar (std of baseline mean-sim) = {base_s:.3f}\n")
-    print(f"    {'configuration':<20} {'mean-sim':>16} {'max-sim':>10} {'subspace':>10} {'acc':>8}")
+    print(f"    {'configuration':<20} {'mean-sim':>16} {'max-sim':>10} {'subspace':>10} {'act-corr':>10} {'acc':>8}")
     bm, bs = mean_std(sim_mean["OFF (baseline)"])
     xm, _  = mean_std(sim_max["OFF (baseline)"])
     sm, _  = mean_std(sim_sub["OFF (baseline)"])
-    am, _ = mean_std(acc_w["OFF (baseline)"])
-    print(f"    {'OFF (baseline)':<20} {bm:>8.3f} +/- {bs:.3f} {xm:>10.3f} {sm:>10.3f} {am:>8.3f}")
+    ac, _  = mean_std(sim_act["OFF (baseline)"])
+    am, _  = mean_std(acc_w["OFF (baseline)"])
+    print(f"    {'OFF (baseline)':<20} {bm:>8.3f} +/- {bs:.3f} {xm:>10.3f} {sm:>10.3f} {ac:>10.3f} {am:>8.3f}")
     for name in pen_specs:
         if name == "OFF (baseline)": continue
-        m, s = mean_std(sim_mean[name])
-        x, _ = mean_std(sim_max[name])
+        m, s   = mean_std(sim_mean[name])
+        x, _   = mean_std(sim_max[name])
         sub, _ = mean_std(sim_sub[name])
+        act, _ = mean_std(sim_act[name])
         sim_gap = m - base_m
         flag = " <--" if abs(sim_gap) > base_s else ""
         a, _ = mean_std(acc_w[name])
-        print(f"    {name:<20} {m:>8.3f} +/- {s:.3f} {x:>10.3f} {sub:>10.3f} {a:>8.3f}{flag}")
+        print(f"    {name:<20} {m:>8.3f} +/- {s:.3f} {x:>10.3f} {sub:>10.3f} {act:>10.3f} {a:>8.3f}{flag}")
 
 if __name__ == "__main__":
     main()
