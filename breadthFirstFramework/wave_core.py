@@ -31,10 +31,10 @@ def all_waves_forward(X, waves):
         return np.empty((X.shape[0], 0))
     return np.hstack([wave_forward(X, W, b) for W, b in waves])
 
-# -- Diversity penalties --
+# diversity penalties
 # goal: push each new wave to specialize differently from the frozen waves
-# uncentered : naive dot-product similarity -- penalizes magnitude, not just angle
-# centered   : covariance form -- removes the magnitude shortcut (Cascade-Correlation)
+# uncentered : naive dot-product similarity -> penalizes magnitude, not just angle
+# centered   : covariance form -> removes the magnitude shortcut (Cascade-Correlation)
 # cosine_act : Rayleigh quotient on centered activations (pure angle, magnitude-invariant)
 # weight_dec : Rayleigh quotient on weight columns (targets the XAI audit directly)
 
