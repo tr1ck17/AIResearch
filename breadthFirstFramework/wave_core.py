@@ -1,11 +1,9 @@
 # wave_core.py
-# Shared utilities imported by cv_evaluation.py and e2eNwaves*.py.
+# Shared utilities imported by cv_evaluation.py and e2eNwaves*.py
 # Contains: primitives, wave helpers, diversity penalties,
-# gradient checks (Section 5), and decorrelation metrics (Section 6).
+# gradient checks, and decorrelation metrics
 
 import numpy as np
-
-# -- Primitives --
 
 def relu(z):
     return np.maximum(0, z)
@@ -73,7 +71,7 @@ def apply_penalty(mode, lam, fo, no, W_new, frozen_W, grad_new_acts, n):
 
     return grad_new_acts, penalty_grad_W
 
-# -- Gradient checks --
+# gradient checks
 # verifies cosine_act and weight_dec gradients against central finite differences
 # relative error ~1e-9 means correct to ~9 significant digits
 # run_gradient_checks() is called at startup by cv_evaluation.py; aborts if any check fails
@@ -139,7 +137,7 @@ def run_gradient_checks():
         raise SystemExit("Gradient check FAILED -- results would be invalid. Aborting.")
     print()
 
-# -- Decorrelation metrics --
+# decorrelation metrics
 # each wave -> N_INPUTS-length profile (mean |weight| per input feature)
 # mean pairwise cosine similarity of profiles: 1.0 = identical, lower = more decorrelated
 

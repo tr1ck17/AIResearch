@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from wave_core import (relu, softmax, cross_entropy, acc as accuracy,
+from wave_core import (softmax, cross_entropy, acc as accuracy,
                        wave_forward, all_waves_forward)
 np.random.seed(42)
 
