@@ -182,7 +182,7 @@ for idx, (W_wave, b_wave) in enumerate(waves):
         print(f" {feat}: {val:.4f}")
 
 # formatting chart
-plt.title("XAI Feature Audit: How Each Wave Prioritizes Raw Patient Biometrics", fontsize=14, fontweight='bold')
+plt.title("XAI Feature Audit: How Each Wave Prioritizes Input Features", fontsize=14, fontweight='bold')
 plt.xlabel("Physical Features", fontsize=12)
 plt.ylabel("Mean Absolute Weight Magnitude (Feature Importance)", fontsize=12)
 plt.xticks(x_indices, feature_names, rotation=15)
@@ -200,7 +200,7 @@ plt.show()
 # This test removes each wave's OUTPUT(its W_out rows) and measures the accuracy drop
 # if prominent waves cause bigger drops, the chart is faithful. if not, it's cosmetic
 
-print("\n FATIHFULNESS TEST: wave prominence vs. actual contribution ")
+print("\n FAITHFULNESS TEST: wave prominence vs. actual contribution ")
 
 # baseline: full trained net on validation set
 frozen_val = all_waves_forward(X_val, waves)
@@ -210,7 +210,7 @@ baseline_acc = accuracy(full_probs, y_val)
 prominences = []
 drops = []
 for i in range(n_waves):
-    #prominence = total bar height for this wave (sum of its 8 feature bars)
+    # prominence = total bar height for this wave (sum across all input feature bars)
     W_wave = waves[i][0]
     prominence = np.sum(np.mean(np.abs(W_wave), axis=1))
 

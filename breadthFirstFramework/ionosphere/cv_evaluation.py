@@ -63,7 +63,7 @@ def acc(p, y):
 
 # SECTION 3 (vanilla standard 1 hidden, vanilla standard 2 hidden, vanilla breadth)
 def train_vanilla(Xtr, ytr, Xva, yva, seed):
-    # 8 inputs features -> VANILLA_HIDDEN -> 2 classes
+    # N_INPUTS features -> VANILLA_HIDDEN -> 2 classes
     rng = np.random.default_rng(seed)
     W1 = he_init(rng, N_INPUTS, VANILLA_HIDDEN)
     b1 = np.zeros(VANILLA_HIDDEN)
@@ -330,12 +330,12 @@ def run_gradient_checks():
 
 
 # SECTION 6 -- Measurement Helpers
-# each wave -> an 8-number feature profile (mean |weight| per input feature).
-# cosine similarity of Wave1 vs Wave2 profiles: 1.0 = identical specialization
+# each wave -> an N_INPUTS-length feature profile (mean |weight| per input feature).
+# cosine similarity of profiles: 1.0 = identical specialization
 # lower = more decorrelated. This is the yardstick for CLAIM B
 
 def profile(W):
-    return np.mean(np.abs(W), axis=1)       # (8, 3) -> (8,)
+    return np.mean(np.abs(W), axis=1)       # (N_INPUTS, WAVE_SIZE) -> (N_INPUTS,)
 
 def cosine(a, b):
     return (a @ b) / (np.linalg.norm(a) * np.linalg.norm(b))
@@ -417,7 +417,6 @@ def main():
 
             # Claim B: decorrelation per penalty (same init => only penalty differs)
             for name, (mode, lam) in pen_specs.items():
-                #_, w = train_waves(Xtr, ytr, Xva, yva, mode, lam, seed=init)
                 a_w, w = train_waves(Xtr, ytr, Xva, yva, mode, lam, seed=init)
                 acc_w[name].append(a_w)
                 m_, mx_ = mean_pairwise_sim(w)
