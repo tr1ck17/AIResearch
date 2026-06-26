@@ -15,16 +15,19 @@
 
 # file map
 # section 1: settings, tunable parameters
-# section 2: base functions (relu, softmax)
 # section 3: the two models (vanilla mlp, constructive wave net)
-# section 4: the four penalty formulations (specifically for claim B)
-# section 5: gradient checks (proof that the penalty math is correct)
-# section 6: measurement helpers (how to quantify if "two waves are different")
 # section 7: experiment runner + printed results
+# (sections 2, 4, 5, 6 live in wave_core.py)
+
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
+from wave_core import (relu, softmax, he_init, cross_entropy, acc,
+                       apply_penalty, run_gradient_checks,
+                       mean_pairwise_sim, activation_decorrelation, subspace_alignment)
 
 # SECTION 1
 DATA_PATH = "../data/pima.csv"      # path to data from current dir
@@ -47,19 +50,6 @@ LAMBDAS = [0.1, 1.0, 5.0]
 N_INPUTS = 8
 N_CLASSES = 2
 FEATURES = ["Pregnancies", "Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI", "DiabetesPedigree", "Age"]
-
-# SECTION 2
-def relu(z):
-    return np.maximum(0, z)
-def he_init(rng, i, o):
-    return rng.standard_normal((i, o)) * np.sqrt(2.0 / i)
-def softmax(z):
-    e = np.exp(z  - z.max(1, keepdims=True))
-    return e / e.sum(1, keepdims=True)
-def cross_entropy(p, y):
-    return -np.mean(np.log(p[np.arange(len(y)), y] + 1e-8))
-def acc(p, y):
-    return np.mean(np.argmax(p, 1) == y)
 
 # SECTION 3 (the two models)
 def train_vanilla(Xtr, ytr, Xva, yva, seed):
@@ -158,177 +148,6 @@ def train_waves(Xtr, ytr, Xva, yva, penalty_mode, lam, seed):
 
     Av = forward_frozen(Xva)
     return acc(softmax(Av @ W_out + b_out), yva), waves
-
-# SECTION 4 (CORE OF CLAIM B - the 4 diversity penalties)
-
-# goal of every penalty: push Wave 2 to be different from Wave 1
-# they differ in WHAT they measure as similarity
-# 2 act on activations (what the waves output)
-# 1 acts on weights directly
-
-# uncentered : sum( (frozen.T @ new)^2 )
-    # the naive first instinct
-    # FLAW: ReLU outputs are non-negative, so the cheapest way to shrink the product is to shrink the new wave (magnitude)
-    # not rotate it (correlation). Penalizes size, not similarity
-
-# centered : same, but mean-center activations first (covariance). Removes  the magnitude shortcut
-    # this is the Cascade-Correlation form
-
-# cosine_act : correlation normalized by magnitude (pure angle). Fully magnitude-invariant. A Rayleigh quotient -> clean
-    # gradient
-
-# weight_dec : decorrelate the WEIGHT vectors directly, not the activations
-    # targets the exact quantity the XAI audit reads. Also Rayleigh
-
-# the activation gradients chain through column-centering; weight_dec adds  straight to the weight gradient
-# gradients for cosine_act and weight_dec are verified in section 5
-
-def apply_penalty(mode, lam, fo, no, W_new, frozen_W, grad_new_acts, n):
-    penalty_grad_W = 0.0
-    if mode == "uncentered":
-        grad_new_acts = grad_new_acts + lam * 2 * (fo @ (fo.T @ no)) / (n**2)
-
-    elif mode == "centered":
-        frozen_centered = fo - fo.mean(0)
-        new_centered = no - no.mean(0)
-        g = 2 * (frozen_centered @ (frozen_centered.T @ new_centered)) / (n**2)
-        grad_new_acts = grad_new_acts + lam * (g - g.mean(0))
-
-    elif mode == "cosine_act":              # Option 2
-        frozen_centered = fo - fo.mean(0)
-        new_centered = no - no.mean(0)
-        fn = np.linalg.norm(frozen_centered, axis=0) + 1e-12
-        frozen_dirs = frozen_centered / fn
-        ng2 = (new_centered * new_centered).sum(0) + 1e-12
-        proj = frozen_dirs @ (frozen_dirs.T @ new_centered)
-        proj_coef = (new_centered * proj).sum(0) / ng2
-        gg = 2 * (proj - new_centered * proj_coef) / ng2
-        grad_new_acts = grad_new_acts + lam * (gg-gg.mean(0))
-
-    elif mode == "weight_dec":              # Option 3
-        Wf = np.hstack(frozen_W)
-        fn = np.linalg.norm(Wf, axis=0) + 1e-12
-        frozen_weight_dirs = Wf / fn
-        wn2 = (W_new * W_new).sum(0) + 1e-12
-        proj = frozen_weight_dirs @ (frozen_weight_dirs.T @ W_new)
-        proj_coef = (W_new * proj).sum(0) / wn2
-        penalty_grad_W = lam * 2 * (proj - W_new * proj_coef) / wn2
-    return grad_new_acts, penalty_grad_W
-
-# SECTION 5
-# Gradient Checks (to prove section 4 math is correct)
-# each penalty is a Rayleigh quotient; we verify the analytic gradient against central finite differences
-# Relative error ~1e-9 = correct to ~9 digits
-# runs automatically at startup; aborts the program if anything fails
-
-def _pen2_val(fo, no):
-    frozen_centered, new_centered = fo - fo.mean(0), no - no.mean(0)
-    fn = np.linalg.norm(frozen_centered, axis=0) + 1e-12
-    frozen_dirs = frozen_centered / fn
-    ng2 = (new_centered * new_centered).sum(0) + 1e-12
-    return ((new_centered * (frozen_dirs @ (frozen_dirs.T @ new_centered))).sum(0) / ng2).sum()
-
-def _pen2_grad(fo, no):
-    frozen_centered, new_centered = fo - fo.mean(0), no - no.mean(0)
-    fn = np.linalg.norm(frozen_centered, axis=0) + 1e-12
-    frozen_dirs = frozen_centered / fn
-    ng2 = (new_centered*new_centered).sum(0) + 1e-12
-    proj = frozen_dirs @ (frozen_dirs.T @ new_centered)
-    proj_coef = (new_centered*proj).sum(0)/ng2
-    gg = 2*(proj - new_centered*proj_coef)/ng2
-    return gg - gg.mean(0)
-
-def _pen3_val(Wf, W_new):
-    fn = np.linalg.norm(Wf, axis=0) + 1e-12
-    frozen_weight_dirs = Wf / fn
-    wn2 = (W_new*W_new).sum(0) + 1e-12
-    return ((W_new * (frozen_weight_dirs @ (frozen_weight_dirs.T @ W_new))).sum(0) / wn2).sum()
-
-def _pen3_grad(Wf, W_new):
-    fn = np.linalg.norm(Wf, axis=0) + 1e-12
-    frozen_weight_dirs = Wf / fn
-    wn2 = (W_new*W_new).sum(0) + 1e-12
-    proj = frozen_weight_dirs @ (frozen_weight_dirs.T @ W_new)
-    proj_coef = (W_new*proj).sum(0)/wn2
-    return 2*(proj - W_new*proj_coef)/wn2
-
-def _gradcheck(val, grad, fixed, var, label, eps=1e-6):
-    ga = grad(*fixed, var)
-    gn = np.zeros_like(var)
-    it = np.nditer(var, flags=['multi_index'])
-    while not it.finished:
-        i = it.multi_index
-        v = var[i]
-        var[i] = v + eps
-        fp = val(*fixed, var)
-        var[i] = v - eps
-        fm = val(*fixed, var)
-        var[i] = v
-        gn[i] = (fp - fm) / (2*eps)
-        it.iternext()
-    err = np.max(np.abs(ga - gn)) / (np.max(np.abs(gn)) + 1e-12)
-    status = "PASS" if err < 1e-5 else "FAIL"
-    print(f" gradient check {label:<28}: rel error {err:.1e} {status}")
-    return err < 1e-5
-
-def run_gradient_checks():
-    print("SECTION 5 -- verifying penalty gradients before trusting results")
-    rng = np.random.default_rng(0)
-    fo = np.maximum(0, rng.standard_normal((40, 6)))
-    no = np.maximum(0, rng.standard_normal((40, 3)))
-    Wf = rng.standard_normal((8, 6))
-    W_new = rng.standard_normal((8, 3))
-    ok1 = _gradcheck(_pen2_val, _pen2_grad, (fo,), no, "cosine_act (d/d activations)")
-    ok2 = _gradcheck(_pen3_val, _pen3_grad, (Wf,), W_new, "weight_dec (d/d weights)")
-    if not (ok1 and ok2):
-        raise SystemExit("Gradient check FAILED -- results would be invalid. Aborting.")
-    print()
-
-
-# SECTION 6 -- Measurement Helpers
-# each wave -> an 8-number feature profile (mean |weight| per input feature).
-# cosine similarity of Wave1 vs Wave2 profiles: 1.0 = identical specialization
-# lower = more decorrelated. This is the yardstick for CLAIM B
-
-def profile(W):
-    return np.mean(np.abs(W), axis=1)       # (8, 3) -> (8,)
-
-def cosine(a, b):
-    return (a @ b) / (np.linalg.norm(a) * np.linalg.norm(b))
-
-def mean_pairwise_sim(waves):
-    profs = [profile(W) for W, _ in waves]
-    sims = [cosine(profs[i], profs[j])
-            for i in range(len(profs)) for j in range(i+1, len(profs))]
-    return float(np.mean(sims)), float(np.max(sims))
-
-def activation_decorrelation(waves, X):
-    # activation-space analogue of mean_pairwise_sim, computed on real data X
-    # each wave -> mean activation per sample, mean-centered across samples
-    # returns mean absolute Pearson correlation over wave pairs; lower = more decorrelated
-    acts = []
-    for W, b in waves:
-        a = relu(X @ W + b).mean(axis=1)
-        a = a - a.mean()
-        acts.append(a)
-    corrs = []
-    for i in range(len(acts)):
-        for j in range(i + 1, len(acts)):
-            denom = (np.linalg.norm(acts[i]) * np.linalg.norm(acts[j])) + 1e-12
-            corrs.append(abs((acts[i] @ acts[j]) / denom))
-    return float(np.mean(corrs))
-
-def subspace_alignment(waves):
-    Ws = [W for W, _ in waves]
-    vals = []
-    for i in range(len(Ws)):
-        others = np.hstack([Ws[j] for j in range(len(Ws)) if j != i])
-        fn = np.linalg.norm(others, axis=0) + 1e-12
-        frozen_dirs = others / fn
-        Wi = Ws[i]
-        wn2 = (Wi * Wi).sum(0)+ 1e-12
-        vals.append(((Wi * (frozen_dirs @ (frozen_dirs.T @ Wi))).sum(0) / wn2).mean())
-    return float(np.mean(vals))
 
 # SECTION 7 -- EXPERIMENT RUNNER
 def main():

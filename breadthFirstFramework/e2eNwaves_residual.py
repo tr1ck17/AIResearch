@@ -1,8 +1,16 @@
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from wave_core import (relu, softmax, cross_entropy, acc as accuracy,
+                       wave_forward, all_waves_forward)
 np.random.seed(42)
+
+def he_init(i, o):
+    return np.random.randn(i, o) * np.sqrt(2.0 / i)
 
 # data
 df = pd.read_csv('../data/pima.csv', header=None)
@@ -14,31 +22,6 @@ X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_st
 scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_val = scaler.transform(X_val)
-
-def relu(x):
-    return np.maximum(0, x)
-
-def softmax(x):
-    e = np.exp(x - x.max(axis=1, keepdims=True))
-    return e / e.sum(axis=1, keepdims=True)
-
-def he_init(i, o):
-    return np.random.randn(i, o) * np.sqrt(2.0 / i)
-
-def wave_forward(X, W, b):
-    A = X @ W + b
-    return relu(A)
-
-def cross_entropy(probs, y_true):
-    return -np.mean(np.log(probs[np.arange(len(y_true)), y_true] + 1e-8))
-
-def accuracy(probs, y_true):
-    return np.mean(np.argmax(probs, axis=1) == y_true)
-
-def all_waves_forward(X, waves):
-    if len(waves) == 0:
-        return np.empty((X.shape[0], 0))
-    return np.hstack([wave_forward(X, W, b) for W, b in waves])
 
 # config
 n_waves = 5
@@ -121,7 +104,7 @@ for wave_idx in range(n_waves):
             else:
                 base_val = np.zeros((X_val.shape[0], n_classes))
             new_val_logits = new_val @ W_out[wave_idx*wave_size:, :]
-            val_probs = softmax(base_val)
+            val_probs = softmax(base_val + new_val_logits + b_out)
             val_accuracy = accuracy(val_probs, y_val)
             loss = cross_entropy(probs, y_train)
             print(f"Epoch {epoch:4d} | Loss: {loss:.4f} | Val Acc: {val_accuracy:.4f}")

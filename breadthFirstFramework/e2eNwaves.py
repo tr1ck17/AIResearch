@@ -1,8 +1,16 @@
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from wave_core import (relu, softmax, cross_entropy, acc as accuracy,
+                       apply_penalty, wave_forward, all_waves_forward)
 np.random.seed(42)
+
+def he_init(i, o):
+    return np.random.randn(i, o) * np.sqrt(2.0 / i)
 
 # Data
 df = pd.read_csv('../data/pima.csv', header=None)
@@ -14,57 +22,6 @@ X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_st
 scaler  = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_val   = scaler.transform(X_val)
-
-def relu(x):
-    return np.maximum(0, x)
-
-def softmax(x):
-    e = np.exp(x - np.max(x, axis=1, keepdims=True))
-    return e / e.sum(axis=1, keepdims=True)
-
-def he_init(i, o):
-    return np.random.randn(i, o) * np.sqrt(2.0 / i)
-
-def wave_forward(X, W, b):
-    return relu(X @ W + b)
-
-def cross_entropy(probs, y_true):
-    return -np.mean(np.log(probs[np.arange(len(y_true)), y_true] + 1e-8))
-
-def accuracy(probs, y_true):
-    return np.mean(np.argmax(probs, axis=1) == y_true)
-
-def all_waves_forward(X, waves):
-    if len(waves) == 0:
-        return np.empty((X.shape[0], 0))
-    return np.hstack([wave_forward(X, W, b) for W, b in waves])
-
-def apply_penalty(mode, lam, fo, no, Wn, frozen_W, dA, n):
-    dW_pen = 0.0
-    if mode == "uncentered":
-        dA = dA + lam * 2 * (fo @ (fo.T @ no)) / (n**2)
-    elif mode == "centered":
-        Fc, Nc = fo - fo.mean(0), no - no.mean(0)
-        g = 2 * (Fc @ (Fc.T @ Nc)) / (n**2)
-        dA = dA + lam * (g - g.mean(0))
-    elif mode == "cosine_act":
-        Fc, Nc = fo - fo.mean(0), no - no.mean(0)
-        fn = np.linalg.norm(Fc, axis=0) + 1e-12
-        U  = Fc / fn
-        ng2 = (Nc * Nc).sum(0) + 1e-12
-        MG  = U @ (U.T @ Nc)
-        Sb  = (Nc * MG).sum(0) / ng2
-        gg  = 2 * (MG - Nc * Sb) / ng2
-        dA = dA + lam * (gg - gg.mean(0))
-    elif mode == "weight_dec":
-        Wf = np.hstack(frozen_W)
-        fn = np.linalg.norm(Wf, axis=0) + 1e-12
-        Uf = Wf / fn
-        wn2 = (Wn * Wn).sum(0) + 1e-12
-        MW  = Uf @ (Uf.T @ Wn)
-        Sj  = (Wn * MW).sum(0) / wn2
-        dW_pen = lam * 2 * (MW - Wn * Sj) / wn2
-    return dA, dW_pen
 
 # Config 
 n_waves   = 5
@@ -200,7 +157,7 @@ plt.show()
 # This test removes each wave's OUTPUT(its W_out rows) and measures the accuracy drop
 # if prominent waves cause bigger drops, the chart is faithful. if not, it's cosmetic
 
-print("\n FATIHFULNESS TEST: wave prominence vs. actual contribution ")
+print("\n FAITHFULNESS TEST: wave prominence vs. actual contribution ")
 
 # baseline: full trained net on validation set
 frozen_val = all_waves_forward(X_val, waves)
