@@ -1,5 +1,5 @@
 import os, sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
 import numpy as np
 import pandas as pd
@@ -13,7 +13,7 @@ def he_init(i, o):
     return np.random.randn(i, o) * np.sqrt(2.0 / i)
 
 # Data
-df = pd.read_csv('../data/pima.csv', header=None)
+df = pd.read_csv('../../data/pima.csv', header=None)
 X = df.iloc[:, :8].values
 y = df.iloc[:, 8].values
 

@@ -20,7 +20,7 @@
 # (sections 2, 4, 5, 6 live in wave_core.py)
 
 import os, sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
 import numpy as np
 import pandas as pd
@@ -30,7 +30,7 @@ from wave_core import (relu, softmax, he_init, cross_entropy, acc,
                        mean_pairwise_sim, activation_decorrelation, subspace_alignment)
 
 # SECTION 1
-DATA_PATH = "../data/pima.csv"      # path to data from current dir
+DATA_PATH = "../../data/pima.csv"      # path to data from current dir
 
 # fixed seed list with enough randomness for meaningful results + reproducibility
 SEEDS = [42, 7, 123, 2024, 88]
