@@ -29,7 +29,7 @@ wave_size = 3
 n_inputs  = 8
 n_classes = 2
 lr        = 0.01
-epochs    = 100
+epochs    = 1000
 
 # Matrix toggles
 freeze_old_paths = True # true means lock frozen wave rows in W_out, False = let them drift
