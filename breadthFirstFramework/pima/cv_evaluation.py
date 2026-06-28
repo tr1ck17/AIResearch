@@ -149,7 +149,7 @@ def train_waves(Xtr, ytr, Xva, yva, penalty_mode, lam, seed):
     Av = forward_frozen(Xva)
     return acc(softmax(Av @ W_out + b_out), yva), waves
 
-# SECTION 7 -- EXPERIMENT RUNNER
+# SECTION 7: experiment runner
 def main():
     run_gradient_checks()
 
@@ -169,13 +169,13 @@ def main():
     sim_act = {k: [] for k in pen_specs}
     acc_w = {k: [] for k in pen_specs}
 
-    print(f"Running {len(SEEDS)} seeds x {N_FOLDS} folds = {len(SEEDS)*N_FOLDS} "
-          f"runs per configuration...\n")
+    print(f"Running {len(SEEDS)} seeds x {N_FOLDS} folds = {len(SEEDS)*N_FOLDS} runs per configuration...\n")
     
     for seed in SEEDS:
         skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=seed)
         for k, (tr, va) in enumerate(skf.split(X, y)):
-            mu, sd = X[tr].mean(0), X[tr].std(0); sd[sd == 0] = 1
+            mu, sd = X[tr].mean(0), X[tr].std(0)
+            sd[sd == 0] = 1
             Xtr, Xva = (X[tr]-mu)/sd, (X[va]-mu)/sd
             ytr, yva = y[tr], y[va]
             init = seed * 1000 + k          # reproducible, unique per (seed, fold)

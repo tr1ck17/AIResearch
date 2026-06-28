@@ -33,7 +33,7 @@ epochs    = 1000
 
 # Matrix toggles
 freeze_old_paths = True # true means lock frozen wave rows in W_out, False = let them drift
-penalty_mode = "weight_dec"     # "off" | "uncentered" | "centered" | "cosine_act" | "weight_dec"
+penalty_mode = "off"     # "off" | "uncentered" | "centered" | "cosine_act" | "weight_dec"
 #lambda_ = 0.001
 lambda_ = 1.00
 
@@ -120,7 +120,7 @@ x_indices = np.arange(len(feature_names))
 bar_width = 0.18
 
 # extracting and plotting feature importances for each wave
-for idx, (W_wave, b_wave) in enumerate(waves):
+for idx, (W_wave, _) in enumerate(waves):
     # calculating absolute magnitude averaged across the wave's hidden neurons
     feature_importance = np.mean(np.abs(W_wave), axis=1)
 
@@ -170,10 +170,15 @@ for i in range(n_waves):
     #prominence = total bar height for this wave (sum of its 8 feature bars)
     W_wave = waves[i][0]
     prominence = np.sum(np.mean(np.abs(W_wave), axis=1))
+    # np.mean(np.abs(W_wave), axis=1) -> the 8 profile numbers (magnitude driven; sign doesn't matter)
+    # np.sum adds them into one number; the wave's total bar height
+    # the total bar height of this wave is basically the claim about how much that wave matters
 
     # ablate: zero this wave's 3 output rows, leave everything else intact
     W_out_ablated = W_out.copy()
     W_out_ablated[i*wave_size:(i+1)*wave_size, :]= 0.0
+    # W_out_ablated becomes the same matrix as the shared output weights
+    # the 
 
     ablated_probs = softmax(frozen_val @ W_out_ablated + b_out)
     ablated_acc = accuracy(ablated_probs, y_val)
