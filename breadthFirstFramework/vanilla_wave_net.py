@@ -8,7 +8,7 @@ from sklearn.model_selection import StratifiedKFold
 from ucimlrepo import fetch_ucirepo
 from wave_core import relu, softmax, he_init, acc
 
-# -- Config --
+# config
 SEEDS     = [42, 7, 123, 2024, 88]
 N_FOLDS   = 5
 N_WAVES   = 5
@@ -20,13 +20,13 @@ ROOT      = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR  = os.path.join(ROOT, '..', 'data')
 CACHE_DIR = os.path.join(ROOT, 'dataset_cache')
 
-# -- Helpers --
+# helpers
 
 def drop_zero_variance(X):
     return X[:, X.std(axis=0) > 1e-12]
 
 def encode_labels(y):
-    _, encoded = np.unique(y, return_inverse=True)
+    _, encoded = np.unique(y, return_index=False, return_inverse=True, return_counts=False)
     return encoded.astype(int)
 
 def load_cache(name):
@@ -50,34 +50,34 @@ def fetch_and_cache(name, fetch_fn):
     print(f"  [OK] {name}")
     return X, y
 
-# -- Dataset Loaders --
+# dataset loaders
 
 def load_datasets():
     datasets = []
     print("Loading datasets...")
 
-    # Pima -- local CSV, binary, 8 features, 768 samples
+    # Pima: local CSV, binary, 8 features, 768 samples
     df = pd.read_csv(os.path.join(DATA_DIR, 'pima.csv'), header=None)
     X  = drop_zero_variance(df.iloc[:, :8].values.astype(float))
     y  = df.iloc[:, 8].values.astype(int)
     datasets.append(("Pima", X, y))
     print("  [OK] Pima")
 
-    # Ionosphere -- local CSV, binary (g=1, b=0), 33 features after zero-variance drop
+    # Ionosphere: local CSV, binary (g=1, b=0), 33 features after zero-variance drop
     df = pd.read_csv(os.path.join(DATA_DIR, 'ionosphere.csv'), header=None)
     X  = drop_zero_variance(df.iloc[:, :-1].values.astype(float))
     y  = np.where(df.iloc[:, -1].values == 'g', 1, 0)
     datasets.append(("Ionosphere", X, y))
     print("  [OK] Ionosphere")
 
-    # Breast Cancer -- sklearn built-in, binary, 30 features, 569 samples
+    # Breast Cancer: sklearn built-in, binary, 30 features, 569 samples
     def fetch_breast_cancer():
         X, y = load_breast_cancer(return_X_y=True)
         return drop_zero_variance(X), y
     X, y = fetch_and_cache("breast_cancer", fetch_breast_cancer)
     datasets.append(("Breast Cancer", X, y))
 
-    # Banknote Authentication -- UCI id=267, binary, 4 features, 1372 samples
+    # Banknote Authentication: UCI id=267, binary, 4 features, 1372 samples
     def fetch_banknote():
         repo = fetch_ucirepo(id=267)
         X = drop_zero_variance(repo.data.features.values.astype(float))  # type: ignore[union-attr]
@@ -86,7 +86,7 @@ def load_datasets():
     X, y = fetch_and_cache("banknote", fetch_banknote)
     datasets.append(("Banknote Auth", X, y))
 
-    # Heart Disease -- UCI id=45, 13 features, 303 samples (6 rows dropped for missing values)
+    # Heart Disease: UCI id=45, 13 features, 303 samples (6 rows dropped for missing values)
     # binarized as 0 = no disease, >0 = disease present — standard in the literature
     def fetch_heart():
         repo = fetch_ucirepo(id=45)
@@ -97,7 +97,7 @@ def load_datasets():
     X, y = fetch_and_cache("heart_disease", fetch_heart)
     datasets.append(("Heart Disease", X, y))
 
-    # Wine Quality (Red) -- UCI id=186, 11 features, 1599 samples
+    # Wine Quality (Red): UCI id=186, 11 features, 1599 samples
     # binarized at quality >= 6: the standard cut in the wine quality literature;
     # gives a ~55/45 split on red wine, which is the most defensible threshold
     def fetch_wine():
@@ -108,26 +108,34 @@ def load_datasets():
     X, y = fetch_and_cache("wine_quality", fetch_wine)
     datasets.append(("Wine Quality", X, y))
 
-    # Glass -- UCI id=42, 6-class, 9 features, 214 samples
+    # Glass: UCI id=42, 6-class, 9 features, 214 samples
     # labels are {1,2,3,5,6,7} (no class 4) -- encode_labels remaps to 0-indexed
+    # one class has n<5 samples so it's dropped before evaluation (can't stratify across 5 folds)
     def fetch_glass():
         repo = fetch_ucirepo(id=42)
         X = drop_zero_variance(repo.data.features.values.astype(float))  # type: ignore[union-attr]
         y = encode_labels(repo.data.targets.values.ravel())              # type: ignore[union-attr]
-        return X, y
+        unique, counts = np.unique(y, return_counts=True)
+        valid = unique[counts >= N_FOLDS]
+        mask  = np.isin(y, valid)
+        return X[mask], encode_labels(y[mask])
     X, y = fetch_and_cache("glass", fetch_glass)
     datasets.append(("Glass", X, y))
 
-    # Vehicle -- UCI id=149, 4-class (bus/van/saab/opel), 18 features, 846 samples
+    # Vehicle: UCI id=149, 4-class (bus/van/saab/opel), 18 features, 846 samples
+    # ucimlrepo includes 1 stray sample with a 5th label -- drop classes with n < N_FOLDS
     def fetch_vehicle():
         repo = fetch_ucirepo(id=149)
         X = drop_zero_variance(repo.data.features.values.astype(float))  # type: ignore[union-attr]
         y = encode_labels(repo.data.targets.values.ravel())              # type: ignore[union-attr]
-        return X, y
+        unique, counts = np.unique(y, return_counts=True)
+        valid = unique[counts >= N_FOLDS]
+        mask  = np.isin(y, valid)
+        return X[mask], encode_labels(y[mask])
     X, y = fetch_and_cache("vehicle", fetch_vehicle)
     datasets.append(("Vehicle", X, y))
 
-    # Phoneme -- OpenML id=1489, binary (nasal vs oral), 5 features, 5404 samples
+    # Phoneme: OpenML id=1489, binary (nasal vs oral), 5 features, 5404 samples
     def fetch_phoneme():
         ds = fetch_openml(data_id=1489, as_frame=False, parser='auto')
         X = drop_zero_variance(ds.data.astype(float))
@@ -139,7 +147,7 @@ def load_datasets():
     print()
     return datasets
 
-# -- Model --
+# model
 
 def train_vanilla_wave(Xtr, ytr, Xva, yva, n_inputs, n_classes, seed):
     rng   = np.random.default_rng(seed)
@@ -182,7 +190,7 @@ def train_vanilla_wave(Xtr, ytr, Xva, yva, n_inputs, n_classes, seed):
     val_fo = np.hstack([relu(Xva @ W + b) for W, b in waves])
     return acc(softmax(val_fo @ W_out + b_out), yva)
 
-# -- Evaluation --
+# evaluation
 
 def evaluate(name, X, y):
     n_inputs  = X.shape[1]
@@ -203,7 +211,7 @@ def evaluate(name, X, y):
     print(f"  {name:<22} {m:.4f} +/- {s:.4f}   maj: {majority:.1%}")
     return m, s
 
-# -- Main --
+# main
 
 def main():
     datasets = load_datasets()

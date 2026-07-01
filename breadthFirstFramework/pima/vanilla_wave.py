@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from wave_core import relu, softmax, he_init, cross_entropy, acc
 
-# -- Data --
+# data
 df = pd.read_csv('../../data/pima.csv', header=None)
 X = df.iloc[:, :8].values
 y = df.iloc[:, 8].values
@@ -17,7 +17,7 @@ scaler  = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_val   = scaler.transform(X_val)
 
-# -- Config --
+# config
 N_WAVES   = 5
 WAVE_SIZE = 3
 N_INPUTS  = 8
@@ -26,7 +26,7 @@ LR        = 0.01
 EPOCHS    = 1000
 SEED      = 42
 
-# -- Vanilla Breadth-First Wave Net (no diversity penalty) --
+# vanilla breadth-first
 rng    = np.random.default_rng(SEED)
 waves  = []
 W_out  = np.empty((0, N_CLASSES))
